@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Agent – Tối Ưu Lộ Trình Giao Hàng</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --red:    #C0392B;
+    --red2:   #E74C3C;
+    --orange: #E67E22;
+    --gold:   #F39C12;
+    --green:  #27AE60;
+    --teal:   #16A085;
+    --dark:   #1A1A2E;
+    --navy:   #16213E;
+    --mid:    #2C3E50;
+    --gray:   #7F8C8D;
+    --light:  #F0F2F5;
+    --white:  #FFFFFF;
+    --border: #DDE1E7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--light); color: var(--mid); min-height: 100vh; }
+
+  /* ─── HEADER ─────────────────────────────────────────── */
+  .header {
+    background: #FFFFFF;
+    color: var(--dark);
+    padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border-bottom: 3px solid var(--red);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-logo {
+    width: 44px; height: 44px;
+    background: var(--red);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 2px 8px rgba(192,57,43,0.3);
+  }
+  .header h1 { font-size: 16px; font-weight: 700; color: var(--dark); }
+  .header p  { font-size: 11px; color: var(--gray); margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .badge-demo {
+    background: var(--red); color: white;
+    font-size: 10px; font-weight: 700;
+    padding: 4px 12px; border-radius: 20px; letter-spacing: 1px;
+  }
+  .badge-data {
+    background: #F1F5F9; color: var(--gray);
+    font-size: 10px; padding: 4px 10px; border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  /* ─── API BAR ─────────────────────────────────────────── */
+  .api-bar {
+    background: #F8FAFC;
+    padding: 9px 28px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .api-bar label { color: var(--gray); font-size: 12px; white-space: nowrap; }
+  .api-bar input {
+    flex: 1;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px; color: var(--dark);
+    padding: 7px 12px; font-size: 12px; font-family: monospace; letter-spacing: 1px;
+  }
+  .api-bar input:focus { outline: 2px solid var(--red); }
+  .api-status { font-size: 11px; white-space: nowrap; }
+  .api-status.ok  { color: var(--green); }
+  .api-status.err { color: var(--orange); }
+
+  /* ─── MAIN LAYOUT ─────────────────────────────────────── */
+  .main {
+    display: grid;
+    grid-template-columns: 430px 1fr;
+    height: calc(100vh - 108px);
+    overflow: hidden;
+  }
+
+  /* ─── LEFT PANEL ──────────────────────────────────────── */
+  .left-panel {
+    background: white;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel-header {
+    background: #FFF5F5; color: var(--red);
+    border-bottom: 2px solid #FECACA;
+    padding: 12px 18px; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-header-left { display: flex; align-items: center; gap: 8px; }
+  .pt-count {
+    background: var(--red); color: white;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 10px;
+  }
+  .monthly-strip {
+    background: #FEF9F0;
+    border-bottom: 1px solid #FDECC8;
+    padding: 8px 18px;
+    display: flex; gap: 20px;
+  }
+  .mstat { text-align: center; }
+  .mstat-val { font-size: 15px; font-weight: 800; color: var(--red); }
+  .mstat-label { font-size: 10px; color: var(--gray); margin-top: 1px; }
+
+  /* ─── POINTS LIST ─────────────────────────────────────── */
+  .points-list {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .point-item {
+    background: var(--light); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 12px;
+    display: flex; align-items: flex-start; gap: 10px;
+    transition: all 0.15s; cursor: default;
+  }
+  .point-item:hover { border-color: var(--red); background: #FFF5F5; }
+  .point-badge {
+    min-width: 28px; height: 28px; border-radius: 50%;
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; color: white;
+  }
+  .point-info { flex: 1; min-width: 0; }
+  .point-name { font-size: 13px; font-weight: 700; color: var(--dark); }
+  .point-addr { font-size: 11px; color: var(--gray); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .point-meta { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+  .tag {
+    font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 600;
+  }
+  .tag-kg    { background: #FEE2E2; color: #991B1B; }
+  .tag-time  { background: #FEF3C7; color: #92400E; }
+  .tag-cold  { background: #DBEAFE; color: #1E40AF; }
+  .tag-truck { background: #D1FAE5; color: #065F46; }
+  .tag-monthly { background: #F3E8FF; color: #6B21A8; }
+  .point-products { font-size: 10px; color: #9CA3AF; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .remove-btn {
+    background: none; border: none; cursor: pointer;
+    color: #CBD5E1; font-size: 16px; padding: 2px 4px;
+    transition: color 0.15s; flex-shrink: 0;
+  }
+  .remove-btn:hover { color: var(--red2); }
+
+  /* ─── ADD FORM ────────────────────────────────────────── */
+  .add-form {
+    border-top: 2px dashed var(--border);
+    padding: 12px 14px; background: #FAFAFA;
+  }
+  .add-form h4 { font-size: 11px; color: var(--gray); margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-row { display: flex; gap: 7px; margin-bottom: 7px; }
+  .form-row input, .form-row select {
+    flex: 1; border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 9px; font-size: 12px; color: var(--mid); background: white;
+  }
+  .form-row input:focus, .form-row select:focus { outline: 2px solid var(--red); }
+  .btn-add {
+    background: var(--red); color: white; border: none; border-radius: 6px;
+    padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: background 0.15s;
+  }
+  .btn-add:hover { background: #A93226; }
+
+  /* ─── CONFIG ──────────────────────────────────────────── */
+  .config-section {
+    border-top: 1px solid var(--border);
+    padding: 0; background: white; flex-shrink: 0;
+  }
+  .config-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 14px; cursor: pointer; user-select: none;
+    transition: background 0.15s;
+  }
+  .config-toggle:hover { background: #F8FAFC; }
+  .config-toggle-left { display: flex; align-items: center; gap: 6px; }
+  .config-toggle h4 { font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+  .config-summary { font-size: 11px; color: var(--mid); font-weight: 600; }
+  .config-arrow { font-size: 10px; color: var(--gray); transition: transform 0.2s; }
+  .config-arrow.open { transform: rotate(180deg); }
+  .config-body { padding: 4px 14px 12px; display: none; }
+  .config-body.open { display: block; }
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .config-item label { font-size: 11px; color: var(--gray); display: block; margin-bottom: 3px; }
+  .config-item input, .config-item select {
+    width: 100%; border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 9px; font-size: 12px; color: var(--mid); background: white;
+  }
+
+  /* ─── RUN BUTTON ──────────────────────────────────────── */
+  .run-section { padding: 12px 14px; border-top: 1px solid var(--border); background: white; }
+  .btn-run {
+    background: var(--red); color: white; border: none; border-radius: 8px;
+    padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.15s; box-shadow: 0 2px 8px rgba(192,57,43,0.3);
+  }
+  .btn-run:hover:not(:disabled) { background: #A93226; }
+  .btn-run:disabled { background: #94A3B8; cursor: not-allowed; }
+  .btn-run.running { background: var(--teal); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+
+  /* ─── RIGHT PANEL ─────────────────────────────────────── */
+  .right-panel { display: flex; flex-direction: column; overflow: hidden; }
+
+  .tabs {
+    display: flex; background: #F8FAFC;
+    border-bottom: 2px solid var(--border);
+  }
+  .tab {
+    padding: 11px 22px; cursor: pointer;
+    font-size: 12px; font-weight: 600; color: var(--gray);
+    border-bottom: 3px solid transparent; transition: all 0.15s;
+  }
+  .tab.active { color: var(--red); border-bottom-color: var(--red); background: white; }
+  .tab:hover:not(.active) { color: var(--mid); background: #F1F5F9; }
+
+  .tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* ─── THINKING STREAM ─────────────────────────────────── */
+  .thinking-stream {
+    flex: 1; overflow-y: auto;
+    padding: 18px 22px;
+    font-family: 'Consolas', monospace; font-size: 12.5px; line-height: 1.75;
+    background: #F8FAFC; color: var(--mid);
+  }
+  .thinking-stream .step {
+    margin-bottom: 14px; padding: 11px 14px;
+    border-radius: 6px; border-left: 3px solid var(--red);
+    background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .thinking-stream .step-label {
+    color: var(--red); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;
+  }
+  .thinking-stream .step-text { color: #374151; white-space: pre-wrap; }
+  .cursor { display: inline-block; width: 2px; height: 13px; background: var(--red); animation: blink 0.8s infinite; vertical-align: middle; margin-left: 2px; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .thinking-stream .placeholder { color: #94A3B8; text-align: center; padding: 60px 20px; }
+  .thinking-stream .placeholder h3 { color: #64748B; font-size: 16px; margin-bottom: 10px; font-family: 'Segoe UI', Arial, sans-serif; }
+  .thinking-stream .placeholder p  { font-size: 13px; font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; }
+
+  /* ─── RESULT PANEL ────────────────────────────────────── */
+  .result-panel { flex: 1; overflow-y: auto; padding: 18px 22px; background: white; }
+
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--light); border-radius: 10px; padding: 13px;
+    text-align: center; border: 1px solid var(--border);
+  }
+  .stat-val       { font-size: 24px; font-weight: 800; color: var(--red); }
+  .stat-val.gold  { color: var(--gold); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.navy  { color: var(--navy); }
+  .stat-label     { font-size: 10px; color: var(--gray); margin-top: 4px; }
+
+  .reasoning-box {
+    background: #FFF8F8; border: 1px solid #FECACA;
+    border-radius: 8px; padding: 14px; margin-bottom: 18px;
+  }
+  .reasoning-box h4 { font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 6px; }
+  .reasoning-box p  { font-size: 12px; color: #555; line-height: 1.65; }
+
+  .vehicle-section { margin-bottom: 20px; }
+  .vehicle-header {
+    color: white; padding: 10px 14px;
+    border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 13px;
+  }
+  .vehicle-badge {
+    background: rgba(255,255,255,0.25); color: white;
+    padding: 2px 10px; border-radius: 12px; font-size: 11px;
+  }
+  .vehicle-body {
+    border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 8px 8px; overflow: hidden;
+  }
+  .route-stop {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; border-bottom: 1px solid #F1F5F9;
+    transition: background 0.1s;
+  }
+  .route-stop:hover { background: #FFF5F5; }
+  .route-stop:last-child { border-bottom: none; }
+  .stop-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .stop-info { flex: 1; }
+  .stop-name   { font-size: 13px; font-weight: 700; color: var(--dark); }
+  .stop-addr   { font-size: 11px; color: var(--gray); }
+  .stop-reason { font-size: 10px; color: var(--teal); margin-top: 2px; font-style: italic; }
+  .stop-meta   { text-align: right; }
+  .stop-weight { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .stop-time   { font-size: 10px; color: var(--gray); }
+
+  .comparison {
+    background: linear-gradient(135deg, #FFF5F5, #FFF8F0);
+    border: 1px solid #FECACA; border-radius: 10px;
+    padding: 16px 18px; margin-top: 4px;
+  }
+  .comparison h3 { font-size: 14px; font-weight: 700; color: var(--dark); margin-bottom: 12px; }
+  .compare-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-label { font-size: 12px; color: var(--gray); }
+  .compare-vals  { display: flex; gap: 16px; align-items: center; }
+  .compare-old   { font-size: 12px; color: var(--red2); text-decoration: line-through; }
+  .compare-new   { font-size: 13px; font-weight: 700; color: var(--green); }
+  .compare-save  { font-size: 11px; color: var(--teal); font-weight: 600; }
+
+  .insights-box {
+    background: #F0FDF4; border: 1px solid #A7F3D0;
+    border-radius: 8px; padding: 14px; margin-top: 14px;
+  }
+  .insights-box h4 { font-size: 12px; font-weight: 700; color: var(--teal); margin-bottom: 8px; }
+  .insights-box p  { font-size: 12px; color: #374151; margin-top: 6px; line-height: 1.6; }
+
+  .result-placeholder {
+    text-align: center; padding: 80px 40px; color: #94A3B8;
+  }
+  .result-placeholder .icon { font-size: 52px; margin-bottom: 14px; }
+  .result-placeholder h3 { font-size: 17px; color: #64748B; margin-bottom: 8px; }
+  .result-placeholder p  { font-size: 13px; }
+
+  /* ─── TOAST ───────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 22px; right: 22px;
+    background: var(--dark); color: white;
+    padding: 11px 18px; border-radius: 8px; font-size: 13px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35); display: none; z-index: 999;
+  }
+  .toast.show { display: block; animation: slideUp 0.3s ease; }
+  .toast.error   { border-left: 4px solid var(--red2); }
+  .toast.success { border-left: 4px solid var(--green); }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+  /* ─── MAP ────────────────────────────────────────────────── */
+  #routeMap { flex: 1; min-height: 0; }
+  .map-placeholder {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #94A3B8; background: #F8FAFC;
+  }
+  .map-placeholder .icon { font-size: 52px; margin-bottom: 14px; }
+  .map-placeholder h3 { font-size: 17px; color: #64748B; margin-bottom: 8px; }
+  .map-placeholder p  { font-size: 13px; }
+  .leaflet-popup-content { font-size: 12px; line-height: 1.6; min-width: 160px; }
+  .leaflet-popup-content b { color: #1A1A2E; }
+
+  /* ─── ẨN TÊN KH ─────────────────────────────────────────────────── */
+  .hide-names .kh-name {
+    filter: blur(6px);
+    user-select: none;
+    pointer-events: none;
+    transition: filter 0.25s;
+  }
+  .btn-mask {
+    font-size: 12px; font-weight: 600; padding: 5px 11px;
+    border-radius: 6px; border: 1.5px solid #CBD5E1;
+    background: white; color: #475569; cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    transition: all 0.2s;
+  }
+  .btn-mask.active { background: #FEF3C7; border-color: #F59E0B; color: #92400E; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🚛</div>
+    <div>
+      <h1>AI Agent – Tối Ưu Lộ Trình Giao Hàng</h1>
+    </div>
+  </div>
+  <div class="header-right" style="display:flex;align-items:center;gap:10px;">
+    <button class="btn-mask" id="maskBtn" onclick="toggleMask()" title="Ẩn/hiện tên khách hàng">
+      🔒 Ẩn tên KH
+    </button>
+    <div class="badge-demo">LIVE DEMO</div>
+  </div>
+</div>
+
+<div class="api-bar">
+  <label>🔑 API Key:</label>
+  <input type="password" id="apiKey" placeholder="sk-ant-api03-..." oninput="checkApiKey()" autocomplete="off"/>
+  <span class="api-status" id="apiStatus">— Chưa nhập API Key</span>
+</div>
+
+<div class="main">
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        📍 Điểm Giao Hàng Hôm Nay
+        <span class="pt-count" id="pointCount">12 điểm</span>
+      </div>
+      <span style="font-size:11px;color:#A0AEC0;font-weight:400" id="todayLabel"></span>
+      <script>
+        (function(){
+          const d = new Date();
+          const thu = ['CN','T2','T3','T4','T5','T6','T7'][d.getDay()];
+          const dd = String(d.getDate()).padStart(2,'0');
+          const mm = String(d.getMonth()+1).padStart(2,'0');
+          const yyyy = d.getFullYear();
+          document.getElementById('todayLabel').textContent = `${thu}, ${dd}/${mm}/${yyyy}`;
+        })();
+      </script>
+    </div>
+
+    <!-- Monthly summary strip -->
+    <div class="monthly-strip">
+      <div class="mstat"><div class="mstat-val" id="mTotalKg">—</div><div class="mstat-label">kg hôm nay</div></div>
+      <div class="mstat"><div class="mstat-val" id="mTotalBoxes" style="color:var(--orange)">—</div><div class="mstat-label">thùng hôm nay</div></div>
+      <div class="mstat"><div class="mstat-val" id="mTotalStops">—</div><div class="mstat-label">điểm giao</div></div>
+      <div class="mstat"><div class="mstat-val" id="mAvgKg" style="color:var(--teal)">—</div><div class="mstat-label">tổng tấn đơn</div></div>
+    </div>
+
+    <div class="points-list" id="pointsList"></div>
+
+    <!-- Add form -->
+    <div class="add-form">
+      <h4>+ Thêm điểm giao hàng</h4>
+      <div class="form-row">
+        <input type="text" id="newName" placeholder="Tên cửa hàng" style="flex:1.3"/>
+        <input type="text" id="newAddr" placeholder="Địa chỉ, Quận..." style="flex:2"/>
+      </div>
+      <div class="form-row">
+        <input type="number" id="newWeight" placeholder="Khối lượng (kg)" min="1" style="flex:1"/>
+        <input type="number" id="newBoxes"  placeholder="Số thùng" min="1" style="flex:1"/>
+      </div>
+      <div class="form-row">
+        <input type="text" id="newTime"    placeholder="⏰ Giờ giao bắt buộc (VD: 6:00-8:00)" style="flex:1"/>
+        <input type="text" id="newCompany" placeholder="🏢 Thương hiệu (VD: Dookki)" style="flex:1"/>
+      </div>
+      <div class="form-row">
+        <select id="newVehicle" style="flex:1">
+          <option value="">🚛 Bất kỳ xe lạnh</option>
+          <option value="Xe Tải Lạnh 1">Xe Tải Lạnh 1</option>
+          <option value="Xe Tải Lạnh 2">Xe Tải Lạnh 2</option>
+          <option value="Xe Tải Lạnh 3">Xe Tải Lạnh 3</option>
+          <option value="Xe Tải Lạnh 4">Xe Tải Lạnh 4</option>
+          <option value="Xe Tải Lạnh 5">Xe Tải Lạnh 5</option>
+          <option value="Xe Tải Lạnh 6">Xe Tải Lạnh 6</option>
+          <option value="Xe Tải Lạnh 7">Xe Tải Lạnh 7</option>
+          <option value="Xe Tải Lạnh 8">Xe Tải Lạnh 8</option>
+          <option value="Xe Tải Lạnh 9">Xe Tải Lạnh 9</option>
+          <option value="Xe Tải Lạnh 10">Xe Tải Lạnh 10</option>
+        </select>
+      </div>
+      <button class="btn-add" onclick="addPoint()">+ Thêm điểm giao</button>
+    </div>
+
+    <!-- Config -->
+    <div class="config-section">
+      <div class="config-toggle" onclick="toggleConfig()">
+        <div class="config-toggle-left">
+          <span>🚛</span>
+          <h4>Cấu Hình Đội Xe</h4>
+          <span class="config-summary" id="configSummary">AI đề xuất xe · 2500kg · 05:30</span>
+        </div>
+        <span class="config-arrow" id="configArrow">▼</span>
+      </div>
+      <div class="config-body" id="configBody">
+      <div class="config-grid">
+        <div class="config-item" style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px;">
+          <label style="color:#1D4ED8;font-weight:700">🤖 Số xe</label>
+          <div style="font-size:12px;color:#1D4ED8;margin-top:4px">AI tự đề xuất dựa trên tải trọng & địa lý</div>
+        </div>
+        <div class="config-item">
+          <label>Tải trọng/xe (kg)</label>
+          <input type="number" id="vehicleCapacity" value="2500" min="100" step="100"/>
+        </div>
+        <div class="config-item">
+          <label>Số thùng tối đa/xe</label>
+          <input type="number" id="vehicleMaxBoxes" value="250" min="5"/>
+        </div>
+        <div class="config-item">
+          <label>Giờ xuất kho</label>
+          <input type="text" id="departureTime" value="05:30" placeholder="VD: 05:30"/>
+        </div>
+        <div class="config-item">
+          <label>Bốc dỡ cơ bản/điểm (phút)</label>
+          <input type="number" id="unloadTime" value="30" min="2" max="60"/>
+        </div>
+        <div class="config-item">
+          <label>Bốc dỡ thêm/thùng (phút)</label>
+          <input type="number" id="unloadPerBox" value="0" min="0" max="10"/>
+        </div>
+        <div class="config-item">
+          <label>Tình trạng giao thông</label>
+          <select id="trafficLevel">
+            <option value="low">Thông thoáng (x1.0)</option>
+            <option value="medium" selected>Bình thường (x1.3)</option>
+            <option value="high">Kẹt xe cao điểm (x1.6)</option>
+          </select>
+        </div>
+        <div class="config-item">
+          <label>Ưu tiên</label>
+          <select id="priority">
+            <option value="time">Đúng time-window</option>
+            <option value="distance">Quãng đường ngắn nhất</option>
+            <option value="balanced">Cân bằng tải xe</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label style="font-size:11px;color:var(--gray)">Kho xuất phát</label>
+        <input type="text" id="depot" value="Kho Hàng, KCN VSIP II, Thủ Dầu Một, Bình Dương"
+          style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--mid);margin-top:3px;"/>
+      </div>
+      <div style="margin-top:12px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:#C2410C;margin-bottom:8px;">📋 Lộ trình thực tế hiện tại (để so sánh)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:11px;color:var(--gray)">Tổng km tài xế đang chạy</label>
+            <input type="number" id="actualKm" value="" min="0" step="1" placeholder="VD: 120"
+              style="width:100%;border:1px solid #FED7AA;border-radius:6px;padding:5px 8px;font-size:12px;margin-top:3px;"/>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--gray)">Tổng thời gian thực tế (phút)</label>
+            <input type="number" id="actualMin" value="" min="0" step="5" placeholder="VD: 240"
+              style="width:100%;border:1px solid #FED7AA;border-radius:6px;padding:5px 8px;font-size:12px;margin-top:3px;"/>
+          </div>
+        </div>
+        <div style="font-size:10px;color:#9A3412;margin-top:6px;">Để trống nếu chưa có số liệu – AI sẽ ước tính baseline từ thứ tự danh sách</div>
+      </div>
+      </div><!-- end config-body -->
+    </div>
+
+    <!-- Run -->
+    <div class="run-section">
+      <button class="btn-run" id="runBtn" onclick="runAgent()">
+        🤖 Chạy AI Agent Tối Ưu Lộ Trình
+      </button>
+      <div style="font-size:10px;color:#94A3B8;text-align:center;margin-top:6px;">
+        Agent phân tích địa lý, time-window, tải trọng xe lạnh và giải thích từng quyết định
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('thinking')" id="tab-thinking">🧠 Quá Trình Phân Tích</div>
+      <div class="tab" onclick="switchTab('result')"   id="tab-result">📊 Kết Quả Lộ Trình</div>
+      <div class="tab" onclick="switchTab('map')"      id="tab-map">🗺️ Bản Đồ</div>
+    </div>
+
+    <!-- Thinking -->
+    <div class="tab-content active" id="content-thinking">
+      <div class="thinking-stream" id="thinkingStream">
+        <div class="placeholder">
+          <h3>🤖 AI Agent đang chờ lệnh...</h3>
+          <p>Nhập API Key và nhấn "Chạy AI Agent" để bắt đầu.<br/>
+          Agent sẽ phân tích <strong style="color:#FF7B7B">địa lý, time-window, tải trọng xe lạnh</strong><br/>
+          và hiển thị từng bước quyết định tại đây.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="tab-content" id="content-result">
+      <div class="result-panel" id="resultPanel">
+        <div class="result-placeholder">
+          <div class="icon">🗺️</div>
+          <h3>Chưa có kết quả</h3>
+          <p>Chạy AI Agent để xem lộ trình tối ưu.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="tab-content" id="content-map">
+      <div class="map-placeholder" id="mapPlaceholder">
+        <div class="icon">🗺️</div>
+        <h3>Bản đồ lộ trình</h3>
+        <p>Chạy AI Agent để hiển thị tuyến đường trên bản đồ.</p>
+      </div>
+      <div id="routeMap" style="display:none;flex:1;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────
+const DEPOT = { lat: 10.9534, lng: 106.6973, name: "Kho Hàng – VSIP II, Bình Dương" };
+
+const deliveryPoints = [];
+fetch('data.json').then(r=>r.json()).then(data=>{
+  deliveryPoints.push(...data);
+  renderPoints();
+  renderMap && renderMap();
+}).catch(()=>{ /* fallback: data.json not found */ });
+let nextId = 50;
+const VEHICLE_COLORS = ["#C0392B","#2980B9","#27AE60","#8E44AD","#E67E22","#16A085","#D35400","#1A5276","#7D3C98","#117A65"];
+const COMPANY_COLORS = {"Dookki":"#C0392B","Mikado Sushi":"#2980B9","Hankki":"#27AE60","Korean Buffet":"#E67E22","Guzzim":"#8E44AD","0°C":"#16A085"};
+function companyColor(c) { return COMPANY_COLORS[c] || "#7F8C8D"; }
+function isNgoaiThanh(addr) {
+  const a = (addr||'').toLowerCase();
+  return a.includes('bình dương') || a.includes('thủ dầu một') || a.includes('dĩ an') ||
+         a.includes('đồng nai') || a.includes('biên hòa') || a.includes('long thành') ||
+         a.includes('hóc môn') || a.includes('nhà bè') || a.includes('bình chánh') || a.includes('củ chi');
+}
+function addMinutes(timeStr, mins) {
+  if (!timeStr || !timeStr.includes(':')) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = h * 60 + m + Math.round(mins);
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+function effectiveUnload(boxes) {
+  const maxMin = parseInt(document.getElementById('unloadTime').value) || 30;
+  const maxBox = 12;
+  return Math.min(maxMin, Math.max(5, Math.round((boxes || 1) * (maxMin / maxBox))));
+}
+function isLateStop(estimatedArrival, timeWindow, boxes) {
+  if (!estimatedArrival || !timeWindow) return false;
+  const done = addMinutes(estimatedArrival, effectiveUnload(boxes));
+  const windowEnd = (timeWindow.split('-')[1] || '').trim();
+  if (!done || !windowEnd) return false;
+  const [dH, dM] = done.split(':').map(Number);
+  const [wH, wM] = windowEnd.split(':').map(Number);
+  return (dH * 60 + dM) > (wH * 60 + wM);
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────
+function renderPoints() {
+  const list = document.getElementById("pointsList");
+  const totalKg    = deliveryPoints.reduce((s,p) => s + p.weight, 0);
+  const totalBoxes = deliveryPoints.reduce((s,p) => s + (p.boxes||0), 0);
+  document.getElementById("mTotalKg").textContent    = totalKg + ' kg';
+  document.getElementById("mTotalStops").textContent = deliveryPoints.length;
+  document.getElementById("mTotalBoxes").textContent = totalBoxes + ' thùng';
+  document.getElementById("mAvgKg").textContent      = (totalKg / 1000).toFixed(2) + 'T';
+
+  list.innerHTML = deliveryPoints.map((p, i) => {
+    const vehicleList = ['Xe Tải Lạnh 1','Xe Tải Lạnh 2','Xe Tải Lạnh 3','Xe Tải Lạnh 4','Xe Tải Lạnh 5','Xe Tải Lạnh 6','Xe Tải Lạnh 7','Xe Tải Lạnh 8','Xe Tải Lạnh 9','Xe Tải Lạnh 10'];
+    const col = p.vehicle ? (VEHICLE_COLORS[vehicleList.indexOf(p.vehicle)] ?? VEHICLE_COLORS[i % VEHICLE_COLORS.length]) : '#94A3B8';
+    return `
+    <div class="point-item" id="pt-${p.id}">
+      <div class="point-badge" style="background:${col}">${i+1}</div>
+      <div class="point-info">
+        <div class="point-name kh-name">${p.name}</div>
+        <div class="point-addr">📍 ${p.addr}</div>
+        <div class="point-meta">
+          <span class="tag tag-kg">⚖️ ${p.weight}kg</span>
+          ${p.boxes ? `<span class="tag" style="background:#FEF3C7;color:#92400E">📦 ${p.boxes} thùng</span>` : ''}
+          <span class="tag tag-time">⏰ ${p.timeWindow}</span>
+          ${p.company ? `<span class="tag" style="background:${companyColor(p.company)}22;color:${companyColor(p.company)};border:1px solid ${companyColor(p.company)}55">🏢 ${p.company}</span>` : ''}
+          ${isNgoaiThanh(p.addr) ? `<span class="tag" style="background:#FFF3E0;color:#E65100;border:1px solid #FFCC80;font-weight:700">🚐 Ngoại thành</span>` : `<span class="tag" style="background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7">🏙️ Nội thành</span>`}
+          ${p.vehicle ? `<span class="tag tag-truck">🚛 ${p.vehicle}</span>` : ''}
+        </div>
+      </div>
+      <button class="remove-btn" onclick="removePoint(${p.id})">✕</button>
+    </div>`;
+  }).join('');
+  document.getElementById("pointCount").textContent = deliveryPoints.length + ' điểm';
+}
+
+function addPoint() {
+  const name   = document.getElementById("newName").value.trim();
+  const addr   = document.getElementById("newAddr").value.trim();
+  const weight  = parseInt(document.getElementById("newWeight").value) || 30;
+  const boxes   = parseInt(document.getElementById("newBoxes").value)  || Math.ceil(weight / 9);
+  const time    = document.getElementById("newTime").value.trim() || "7:00-9:00";
+  const vehicle = document.getElementById("newVehicle").value;
+  const company = document.getElementById("newCompany").value.trim();
+  if (!name || !addr) { showToast("Vui lòng nhập tên và địa chỉ!", "error"); return; }
+  deliveryPoints.push({ id: nextId++, name, addr, weight, boxes, timeWindow: time, vehicle, company, products:"Thực phẩm tươi" });
+  ["newName","newAddr","newWeight","newBoxes","newTime","newCompany"].forEach(id => document.getElementById(id).value = "");
+  renderPoints();
+  showToast("Đã thêm điểm giao ✓", "success");
+}
+
+function removePoint(id) {
+  const idx = deliveryPoints.findIndex(p => p.id === id);
+  if (idx > -1) { deliveryPoints.splice(idx, 1); renderPoints(); }
+}
+
+// ─── API KEY CHECK ───────────────────────────────────────────────────
+function checkApiKey() {
+  const key = document.getElementById("apiKey").value.trim();
+  const el  = document.getElementById("apiStatus");
+  if (key.startsWith("sk-ant-") && key.length > 20) {
+    el.className = "api-status ok"; el.textContent = "✓ API Key hợp lệ";
+  } else if (key.length > 5) {
+    el.className = "api-status err"; el.textContent = "⚠ Định dạng chưa đúng";
+  } else {
+    el.className = "api-status"; el.textContent = "— Chưa nhập API Key";
+  }
+}
+
+// ─── AGENT ───────────────────────────────────────────────────────────
+async function runAgent() {
+  if (location.protocol === 'file:') {
+    switchTab("thinking");
+    const stream = document.getElementById("thinkingStream");
+    stream.innerHTML = `<div class="step"><div class="step-label" style="color:#FC8181">\u274c KHÔNG THỂ GỌI API TỪ FILE://</div><div class="step-text" style="color:#FC8181; white-space:pre-line">Trình duyệt chặn kết nối API khi mở file trực tiếp (file://).
+
+<b>Cách 1 – Dùng localhost (30 giây):</b>
+1. Mở Terminal
+2. cd vào thư mục chứa file HTML này
+3. Chạy: python3 -m http.server 8080
+4. Mở trình duyệt → http://localhost:8080/index.html
+
+<b>Cách 2 – Dùng link đã deploy</b>: truy cập link Vercel/Netlify thay vì mở file HTML trực tiếp.</div></div>`;
+    showToast("Cần chạy từ localhost hoặc link deploy, không phải file://", "error");
+    return;
+  }
+  if (deliveryPoints.length < 2) { showToast("Cần ít nhất 2 điểm giao hàng!", "error"); return; }
+
+  const btn = document.getElementById("runBtn");
+  btn.disabled = true; btn.className = "btn btn-run running";
+  btn.textContent = "🔄 Agent đang phân tích...";
+
+  switchTab("thinking");
+  const stream = document.getElementById("thinkingStream");
+  stream.innerHTML = "";
+
+  const capacity      = parseInt(document.getElementById("vehicleCapacity").value);
+  const maxBoxes      = parseInt(document.getElementById("vehicleMaxBoxes").value);
+  const depot         = document.getElementById("depot").value;
+  const priority      = document.getElementById("priority").value;
+  const departureTime = document.getElementById("departureTime").value || "05:00";
+  const unloadTime    = parseInt(document.getElementById("unloadTime").value) || 5;
+  const unloadPerBox  = parseInt(document.getElementById("unloadPerBox").value) || 0;
+  const trafficLevel  = document.getElementById("trafficLevel").value;
+  const trafficLabel  = trafficLevel === 'low' ? 'Thông thoáng (x1.0 – tốc độ bình thường)' : trafficLevel === 'high' ? 'Kẹt xe cao điểm (x1.6 – chậm hơn 60%)' : 'Bình thường sáng sớm (x1.3 – chậm hơn 30%)';
+  const totalWeight   = deliveryPoints.reduce((s,p) => s + p.weight, 0);
+  const totalBoxes    = deliveryPoints.reduce((s,p) => s + (p.boxes||0), 0);
+
+  // Build prompt text
+  const pointsText = deliveryPoints.map((p, i) =>
+    `  ${i+1}. ${p.name}${p.company ? ` [${p.company}]` : ''}\n     Địa chỉ: ${p.addr}\n     Khối lượng: ${p.weight}kg | Số thùng: ${p.boxes||'?'} thùng | Time-window: ${p.timeWindow}${p.vehicle ? ` | Xe cố định: ${p.vehicle}` : ''}\n     Hàng hóa: ${p.products}`
+  ).join("\n\n");
+
+  const systemPrompt = `Bạn là AI Agent chuyên tối ưu lộ trình giao hàng cho doanh nghiệp phân phối thực phẩm tươi tại TP.HCM và Bình Dương.
+Xe tải lạnh xuất phát từ kho ở Bình Dương, giao hàng sớm buổi sáng trước giờ các điểm mở cửa. Hàng hóa cần duy trì nhiệt độ lạnh, không được trễ giờ.
+Trả lời bằng tiếng Việt, thực tế và chuyên nghiệp.
+QUAN TRỌNG VỀ ĐỊNH DẠNG: Phản hồi PHẢI BẮT ĐẦU NGAY LẬP TỨC bằng khối \`\`\`json. KHÔNG viết bất kỳ text nào trước JSON. Sau JSON mới viết nhận xét. Tất cả giá trị số trong JSON phải là số thuần (không kèm đơn vị như kg, T, %).`;
+
+  const userPrompt = `# TỐI ƯU LỘ TRÌNH GIAO THỰC PHẨM TƯƠI – FU FOOD
+**Kho:** ${depot}
+**Tải trọng mỗi xe:** tối đa ${capacity}kg | tối đa ${maxBoxes} thùng/xe
+**Số xe:** AI tự quyết định số xe tối ưu dựa trên tổng tải và địa lý (không giới hạn cứng)
+**Tổng hôm nay:** ${totalWeight}kg | ${totalBoxes} thùng | ${deliveryPoints.length} cửa hàng
+**Giờ xuất kho:** ${departureTime} (xe xuất phát từ kho lúc này)
+**Thời gian bốc dỡ:** Tối đa ${unloadTime} phút/điểm (12 thùng = ${unloadTime} phút). Ít thùng hơn thì ít thời gian hơn theo tỷ lệ: 1 thùng ≈ ${Math.round(unloadTime/12)} phút, 5 thùng ≈ ${Math.round(5*unloadTime/12)} phút, 8 thùng ≈ ${Math.round(8*unloadTime/12)} phút, 12 thùng = ${unloadTime} phút. Dùng công thức: bốc dỡ = min(${unloadTime}, round(số_thùng × ${Math.round(unloadTime/12)})) phút. Khi tính estimatedArrival phải đảm bảo: giờ_đến + bốc_dỡ ≤ giờ kết thúc time-window.
+**Giao thông:** ${trafficLabel}
+**Ưu tiên:** ${priority === 'time' ? 'Đảm bảo time-window – không trễ giờ mở bếp' : priority === 'distance' ? 'Quãng đường ngắn nhất' : 'Cân bằng tải xe'}
+
+## Danh sách ${deliveryPoints.length} điểm giao (dữ liệu thực ${new Date().toLocaleDateString('vi-VN')}):
+${pointsText}
+
+## Mục tiêu tối ưu (theo thứ tự ưu tiên):
+🔴 **HARD CONSTRAINT – BẮT BUỘC:** Mọi điểm giao PHẢI đến trong time-window. "onTime" PHẢI là true cho TẤT CẢ các điểm. Nếu không thể đảm bảo on-time, bắt buộc phải tách thêm xe hoặc điều chỉnh thứ tự – KHÔNG được để "onTime": false.
+🟢 **Sau khi đảm bảo on-time:** Tối ưu chi phí – dùng ít xe nhất, km ngắn nhất, gom điểm cùng khu vực.
+
+## Yêu cầu AI Agent:
+1. **PHÂN TÍCH địa lý**: Nhóm theo khu vực – Bình Dương (gần kho), TP.HCM Tây (Q1,Q5,Q10,TB,GV,Q11), TP.HCM Nam (Q7,Q8), TP.HCM Đông/Thủ Đức (Bình Thạnh, Q2, TĐ, Q9)
+2. **KIỂM TRA time-window THỰC TẾ (bắt buộc)**: Tính từ giờ xuất kho ${departureTime}, cộng thời gian lái xe (có hệ số kẹt xe), cộng ${unloadTime} phút bốc dỡ mỗi điểm trước đó. Nếu không kịp time-window → bắt buộc đổi thứ tự hoặc tách xe, không được đề xuất route trễ.
+3. **PHÂN LOẠI NỘI/NGOẠI THÀNH & PHƯƠNG TIỆN**:
+   - **Nội thành** (TP.HCM): dùng xe tải lạnh của công ty → "vehicleType": "company"
+   - **Ngoại thành** (Bình Dương, Đồng Nai, Hóc Môn, Nhà Bè, Bình Chánh): đề xuất **thuê xe ngoài** (tiết kiệm hơn cho tuyến xa) → "vehicleType": "outsource", ghi rõ lý do trong "outsourceNote"
+   - Nên gom toàn bộ điểm ngoại thành cùng tỉnh vào 1 tuyến thuê ngoài riêng nếu hợp lý.
+4. **TỰ QUYẾT số xe tối thiểu**: Dùng ít xe nhất có thể mà vẫn đảm bảo on-time + không vượt ${capacity}kg/xe và ${maxBoxes} thùng/xe. Giải thích tại sao không thể dùng ít xe hơn.
+5. **LỘ TRÌNH tối ưu chi phí**: Sắp xếp thứ tự giao để km ngắn nhất, gom điểm cùng khu vực, tránh đi lại chồng chéo. Ước tính km thực tế từng tuyến (kho → điểm 1 → ... → kho) và điền vào "totalDistance_km" của mỗi route.
+6. **ƯỚC TÍNH tiết kiệm**: Km, tổng thời gian, chi phí nhiên liệu ước tính so với lộ trình thủ công.
+7. **SO SÁNH cơ sở**: "manualDistance_km" = km nếu giao theo thứ tự danh sách ban đầu không tối ưu; "optimizedDistance_km" = km sau khi AI tối ưu.
+
+## Yêu cầu đầu ra – trả về JSON hợp lệ trong khối \`\`\`json ... \`\`\`, sau đó là phần nhận xét:
+
+\`\`\`json
+{
+  "summary": {
+    "totalPoints": 0,
+    "numVehicles": 0,
+    "optimizedDistance_km": 0,
+    "manualDistance_km": 0,
+    "timeSaved_min": 0,
+    "fuelSaved_percent": 0,
+    "reasoning": ["ý chính 1 về phân vùng địa lý", "ý chính 2 về time-window và tải trọng", "ý chính 3 về thứ tự giao và tối ưu"]
+  },
+  "routes": [
+    {
+      "vehicleId": "Xe Tải Lạnh 1",
+      "color": "#C0392B",
+      "vehicleType": "company",
+      "outsourceNote": "",
+      "totalWeight": 0,
+      "totalBoxes": 0,
+      "totalStops": 0,
+      "totalDistance_km": 0,
+      "estimatedDuration": "4 giờ",
+      "stops": [
+        {
+          "order": 1,
+          "name": "tên cửa hàng",
+          "address": "địa chỉ",
+          "weight": 0,
+          "boxes": 0,
+          "timeWindow": "6:00-8:00",
+          "estimatedArrival": "05:45",
+          "onTime": true,
+          "reason": "lý do chọn thứ tự này"
+        }
+      ]
+    }
+  ],
+  "agentInsights": ["nhận xét 1", "nhận xét 2", "nhận xét 3"]
+}
+\`\`\`
+
+Điền số thực tế vào tất cả các trường (không giữ số 0, không kèm đơn vị vào giá trị số). Bắt đầu phản hồi NGAY BẰNG \`\`\`json, sau khi đóng \`\`\` mới viết nhận xét chiến lược.`;
+
+  // Animate thinking steps
+  const thinkSteps = [
+    {
+      label: "BƯỚC 1 – ĐỌC DỮ LIỆU GIAO HÀNG HÔM NAY",
+      text: `Đọc ${deliveryPoints.length} điểm giao từ hệ thống...\nTổng khối lượng: ${totalWeight}kg hàng hóa cần duy trì lạnh\nKho xuất phát: ${depot}`
+    },
+    {
+      label: "BƯỚC 2 – PHÂN TÍCH ĐỊA LÝ & NHÓM KHU VỰC",
+      text: (() => {
+        const groups = {};
+        deliveryPoints.forEach(p => {
+          const a = p.addr.toLowerCase();
+          let zone = 'TP.HCM – Khác';
+          if (a.includes('bình dương') || a.includes('thủ dầu một')) zone = 'Bình Dương';
+          else if (a.includes('thủ đức') || a.includes('q.9') || a.includes('quận 9') || a.includes('thảo điền') || a.includes('xa lộ') || a.includes('bình thạnh') || a.includes('p.22') || a.includes('landmark')) zone = 'TP.HCM – Đông/Thủ Đức';
+          else if (a.includes('q.7') || a.includes('quận 7') || a.includes('q.8') || a.includes('quận 8')) zone = 'TP.HCM – Nam';
+          else if (a.includes('q.1') || a.includes('bến nghé') || a.includes('q.5') || a.includes('q.10') || a.includes('q.11') || a.includes('tân bình') || a.includes('gò vấp') || a.includes('phan huy')) zone = 'TP.HCM – Tây/Trung';
+          groups[zone] = (groups[zone] || []);
+          groups[zone].push(p.name.replace('Dookki ',''));
+        });
+        return Object.entries(groups).map(([z,pts]) => `→ ${z}: ${pts.join(', ')}`).join('\n');
+      })()
+    },
+    {
+      label: "BƯỚC 3 – KIỂM TRA TIME-WINDOW, TẢI TRỌNG & THỜI GIAN THỰC TẾ",
+      text: (() => {
+        const exBox5  = unloadTime + 5  * unloadPerBox;
+        const exBox8  = unloadTime + 8  * unloadPerBox;
+        const exBox12 = unloadTime + 12 * unloadPerBox;
+        const earlyPts = deliveryPoints.filter(p=>p.timeWindow.startsWith('6')).map(p=>p.name.replace('Dookki','')).join(', ') || 'Không có';
+        const estVehicles = Math.max(1, Math.ceil(totalWeight / capacity));
+        return `Ràng buộc: tối đa ${capacity}kg và ${maxBoxes} thùng/xe\nGiờ xuất kho: ${departureTime} | Giao thông: ${trafficLabel}\nBốc dỡ: ${unloadTime} phút cố định + ${unloadPerBox} phút/thùng\n  → 5 thùng ≈ ${exBox5} phút | 8 thùng ≈ ${exBox8} phút | 12 thùng ≈ ${exBox12} phút\nTổng tải: ${totalWeight}kg / ${capacity}kg/xe → tối thiểu ${estVehicles} xe\nAI sẽ quyết định số xe tối ưu dựa trên địa lý và time-window...\nTime-window sớm nhất: ${earlyPts}`;
+      })()
+    },
+    {
+      label: "BƯỚC 4 – GỌI CLAUDE API (VRP – Vehicle Routing Problem)",
+      text: `Áp dụng Vehicle Routing Problem với LLM reasoning...\nGửi yêu cầu phân tích đến Claude claude-opus-4-8...\nĐang chờ phản hồi API...`
+    },
+  ];
+
+  for (let i = 0; i < thinkSteps.length; i++) {
+    await new Promise(r => setTimeout(r, 500 + i * 350));
+    const div = document.createElement("div");
+    div.className = "step";
+    div.innerHTML = `<div class="step-label">▶ ${thinkSteps[i].label}</div><div class="step-text">${thinkSteps[i].text}</div>`;
+    stream.appendChild(div);
+    stream.scrollTop = stream.scrollHeight;
+  }
+
+  // Cursor step
+  const cursorDiv = document.createElement("div");
+  cursorDiv.className = "step";
+  cursorDiv.innerHTML = `<div class="step-label">▶ BƯỚC 5 – NHẬN KẾT QUẢ TỪ CLAUDE API</div><div class="step-text">Đang nhận phản hồi<span class="cursor"></span></div>`;
+  stream.appendChild(cursorDiv);
+  stream.scrollTop = stream.scrollHeight;
+
+  const clientKey = (document.getElementById("apiKey")?.value || "").replace(/[\r\n\t]/g,"").trim();
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(clientKey ? { "x-client-api-key": clientKey } : {}) },
+      body: JSON.stringify({
+        model: "claude-opus-4-8",
+        max_tokens: 10000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.content[0].text;
+
+    cursorDiv.innerHTML = `<div class="step-label">✅ BƯỚC 5 – KẾT QUẢ NHẬN ĐƯỢC</div><div class="step-text">Claude API phân tích xong! Đang xử lý kết quả...</div>`;
+
+    // Robust JSON extraction – 3 strategies
+    let result = null;
+    let parseError = null;
+
+    const tryParse = (str) => { try { return JSON.parse(str.trim()); } catch(e) { parseError = e.message; return null; } };
+
+    // Strategy 1: code block ```json ... ```
+    const m1 = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (m1) result = tryParse(m1[1]);
+
+    // Strategy 2: find first { to last } in entire text
+    if (!result) {
+      const start = text.indexOf('{');
+      const end   = text.lastIndexOf('}');
+      if (start !== -1 && end > start) result = tryParse(text.slice(start, end + 1));
+    }
+
+    // Strategy 3: whole text
+    if (!result) result = tryParse(text);
+
+    console.log("Raw API response:", text.substring(0, 800));
+    console.log("Parse result:", result ? "✓ OK" : "✗ Failed – " + parseError);
+
+    await new Promise(r => setTimeout(r, 350));
+    const afterJson = text.replace(/```(?:json)?\s*[\s\S]*?```/gi, "").replace(/\{[\s\S]{200,}\}/g, "").trim();
+    const reasonDiv = document.createElement("div");
+    reasonDiv.className = "step";
+    reasonDiv.innerHTML = `<div class="step-label">🤖 NHẬN XÉT CỦA AGENT</div><div class="step-text">${(afterJson||text).substring(0, 1200)}${(afterJson||text).length > 1200 ? '...' : ''}</div>`;
+    stream.appendChild(reasonDiv);
+
+    if (!result) {
+      const errDiv = document.createElement("div");
+      errDiv.className = "step";
+      errDiv.innerHTML = `<div class="step-label" style="color:#E67E22">⚠ KHÔNG PARSE ĐƯỢC JSON</div><div class="step-text" style="color:#E67E22">${parseError || 'Không tìm thấy khối ```json``` trong phản hồi.'}\n\nKết quả thô (500 ký tự đầu):\n${text.substring(0,500)}</div>`;
+      stream.appendChild(errDiv);
+      showToast("⚠ Nhận được phản hồi nhưng không parse được JSON", "error");
+    } else {
+      try {
+        renderResult(result);
+        renderMap(result);
+        switchTab("result");
+        showToast("✓ Agent đã tối ưu lộ trình thành công!", "success");
+      } catch(renderErr) {
+        console.error("renderResult error:", renderErr);
+        const errDiv = document.createElement("div");
+        errDiv.className = "step";
+        errDiv.innerHTML = `<div class="step-label" style="color:#E74C3C">❌ LỖI RENDER KẾT QUẢ</div><div class="step-text" style="color:#E74C3C">${renderErr.message}\n\nJSON nhận được:\n${JSON.stringify(result,null,2).substring(0,600)}</div>`;
+        stream.appendChild(errDiv);
+        showToast("⚠ Lỗi render: " + renderErr.message, "error");
+      }
+    }
+    stream.scrollTop = stream.scrollHeight;
+
+  } catch(err) {
+    cursorDiv.innerHTML = `<div class="step-label" style="color:#FC8181">❌ LỖI KẾT NỐI API</div><div class="step-text" style="color:#FC8181">${err.message}\n\nKiểm tra lại API Key và kết nối internet.</div>`;
+    showToast("Lỗi: " + err.message, "error");
+  }
+
+  btn.disabled = false; btn.className = "btn btn-run";
+  btn.textContent = "🤖 Chạy AI Agent Tối Ưu Lộ Trình";
+}
+
+// ─── RENDER RESULT ───────────────────────────────────────────────────
+function renderResult(result) {
+  const panel = document.getElementById("resultPanel");
+
+  // Safety checks
+  if (!result || typeof result !== 'object') {
+    panel.innerHTML = `<div style="padding:40px;color:#E74C3C">❌ Kết quả không hợp lệ</div>`; return;
+  }
+  if (!result.summary) result.summary = {};
+  if (!Array.isArray(result.routes)) result.routes = [];
+
+  const s          = result.summary;
+  const numVehicles = result.routes.length;
+  const distRatio  = s.manualDistance_km > 0 ? (1 - s.optimizedDistance_km / s.manualDistance_km) : 0;
+  const saved      = s.fuelSaved_percent || Math.round(distRatio * 100) || 0;
+
+  panel.innerHTML = `
+    <div style="background:linear-gradient(135deg,#1D4ED8,#0EA5E9);border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;color:white;">
+      <div style="font-size:32px">🤖</div>
+      <div>
+        <div style="font-size:13px;opacity:0.85;margin-bottom:3px">AI Agent đề xuất</div>
+        <div style="font-size:22px;font-weight:800">${numVehicles} xe lạnh</div>
+        <div style="font-size:11px;opacity:0.8;margin-top:2px">
+          Tổng tải ${s.totalPoints} điểm · ${s.optimizedDistance_km} km · ~${Math.round(s.optimizedDistance_km/numVehicles)} km/xe
+        </div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div style="font-size:11px;opacity:0.75;margin-bottom:4px">So với thực tế</div>
+        <div style="font-size:18px;font-weight:700">↓ ${saved}%</div>
+        <div style="font-size:10px;opacity:0.75">nhiên liệu & thời gian</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val navy">${s.totalPoints}</div><div class="stat-label">Điểm giao hàng</div></div>
+      <div class="stat-card"><div class="stat-val">${s.optimizedDistance_km} km</div><div class="stat-label">Tổng quãng đường</div></div>
+      <div class="stat-card"><div class="stat-val gold">${s.timeSaved_min} phút</div><div class="stat-label">Thời gian tiết kiệm</div></div>
+      <div class="stat-card"><div class="stat-val green">↓ ${saved}%</div><div class="stat-label">Tiết kiệm nhiên liệu</div></div>
+    </div>
+
+    <div class="reasoning-box">
+      <h4>🤖 Chiến lược AI Agent:</h4>
+      ${Array.isArray(s.reasoning)
+        ? s.reasoning.map((r, i) => `<p style="margin-bottom:${i < s.reasoning.length-1 ? '7' : '0'}px"><strong>${['①','②','③'][i] || (i+1)+'.'}</strong> ${r}</p>`).join('')
+        : `<p>${s.reasoning}</p>`}
+    </div>
+
+    ${result.routes.map(route => `
+      <div class="vehicle-section">
+        <div class="vehicle-header" style="background:${route.vehicleType==='outsource'?'#E65100':route.color||'#C0392B'}">
+          ${route.vehicleType==='outsource'?'🚐':'🚛'} ${route.vehicleId}
+          ${route.vehicleType==='outsource'
+            ? `<span style="background:rgba(255,255,255,0.25);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px">ĐỀ XUẤT THUÊ NGOÀI</span>`
+            : `<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:10px;font-size:10px;margin-left:6px">Xe Công Ty</span>`}
+          <span class="vehicle-badge">${route.totalStops} điểm</span>
+          <span style="margin-left:auto;font-size:11px;font-weight:400">
+            ${route.totalWeight}kg / ${document.getElementById('vehicleCapacity').value}kg &nbsp;|&nbsp; ${route.totalDistance_km ? route.totalDistance_km + ' km &nbsp;|&nbsp; ' : ''}~${route.estimatedDuration}
+          </span>
+        </div>
+        ${route.vehicleType==='outsource' && route.outsourceNote ? `<div style="background:#FFF3E0;padding:7px 14px;font-size:12px;color:#E65100;border-bottom:1px solid #FFE0B2">💡 ${route.outsourceNote}</div>` : ''}
+        <div class="vehicle-body">
+          <div class="route-stop" style="background:#F8FAFF">
+            <div class="stop-num" style="background:#64748B;color:white">🏭</div>
+            <div class="stop-info">
+              <div class="stop-name">Kho xuất phát</div>
+              <div class="stop-addr">${document.getElementById('depot').value}</div>
+            </div>
+          </div>
+          ${route.stops.map(stop => `
+            <div class="route-stop">
+              <div class="stop-num" style="background:${route.color || '#C0392B'};color:white">${stop.order}</div>
+              <div class="stop-info">
+                <div class="stop-name kh-name">${stop.name}</div>
+                <div class="stop-addr">📍 ${stop.address}</div>
+                <div class="stop-reason">💡 ${stop.reason}</div>
+              </div>
+              <div class="stop-meta">
+                <div class="stop-weight">${stop.weight}kg${stop.boxes ? ` / ${stop.boxes}thùng` : ''}</div>
+                <div class="stop-time">⏰ ${stop.timeWindow}</div>
+                ${stop.estimatedArrival ? (() => {
+                  const late = isLateStop(stop.estimatedArrival, stop.timeWindow, stop.boxes);
+                  const done = addMinutes(stop.estimatedArrival, effectiveUnload(stop.boxes));
+                  const unloadMin = effectiveUnload(stop.boxes);
+                  return `<div style="font-size:10px;font-weight:700;color:${late?'#E74C3C':'#27AE60'}">
+                    🕐 Đến: ${stop.estimatedArrival} (+${unloadMin}p) → Xong: ${done} ${late?'⚠ TRỄ':'✓'}
+                  </div>`;
+                })() : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+
+    ${(() => {
+      const inputKm  = parseFloat(document.getElementById('actualKm').value);
+      const inputMin = parseFloat(document.getElementById('actualMin').value);
+      const hasReal  = !isNaN(inputKm) && inputKm > 0;
+      const hasRealMin = !isNaN(inputMin) && inputMin > 0;
+
+      const baselineKm  = hasReal    ? inputKm  : s.manualDistance_km;
+      const baselineMin = hasRealMin ? inputMin : (s.timeSaved_min + Math.round(s.optimizedDistance_km / 30 * 60));
+      const baselineLabel = hasReal ? 'thực tế hiện tại' : 'ước tính (thứ tự nhập liệu)';
+
+      const savedKm  = Math.max(0, baselineKm - s.optimizedDistance_km);
+      const savedMin = Math.max(0, baselineMin - Math.round(s.optimizedDistance_km / 30 * 60));
+      const savedPct = baselineKm > 0 ? Math.round(savedKm / baselineKm * 100) : 0;
+      const fuelSave = Math.round(savedKm * 0.15 * result.routes.length * 25000);
+
+      return `
+      <div class="comparison">
+        <h3>📊 So Sánh Trước & Sau Tối Ưu</h3>
+        <p style="font-size:10px;color:#94A3B8;margin-bottom:10px">
+          * "Trước" = ${baselineLabel}${!hasReal ? ' — nhập số liệu thực tế ở phần Cấu Hình để so sánh chính xác hơn' : ''}
+        </p>
+        <div class="compare-row">
+          <span class="compare-label">Tổng quãng đường</span>
+          <div class="compare-vals">
+            <span class="compare-old">${baselineKm} km (trước)</span>
+            <span class="compare-new">${s.optimizedDistance_km} km (AI đề xuất)</span>
+            <span class="compare-save">↓ ${savedKm} km (${savedPct}%)</span>
+          </div>
+        </div>
+        <div class="compare-row">
+          <span class="compare-label">Thời gian</span>
+          <div class="compare-vals">
+            <span class="compare-old">${baselineMin} phút (trước)</span>
+            <span class="compare-new">${Math.round(s.optimizedDistance_km / 30 * 60)} phút (AI đề xuất)</span>
+            <span class="compare-save">↓ ${savedMin} phút (~${Math.round(savedMin/60*10)/10} giờ)</span>
+          </div>
+        </div>
+        <div class="compare-row">
+          <span class="compare-label">Chi phí nhiên liệu xe lạnh (ước tính)</span>
+          <div class="compare-vals">
+            <span class="compare-new">Tiết kiệm ~${savedPct}%</span>
+            <span class="compare-save">≈ ${fuelSave.toLocaleString()} VNĐ/ngày</span>
+          </div>
+        </div>
+      </div>`;
+    })()}
+
+    ${result.agentInsights ? `
+    <div class="insights-box">
+      <h4>💡 Khuyến nghị từ AI Agent:</h4>
+      ${result.agentInsights.map(i => `<p>• ${i}</p>`).join('')}
+    </div>` : ''}
+  `;
+}
+
+// ─── MAP (Leaflet + OpenStreetMap) ───────────────────────────────────
+let _leafletMap = null;
+let _lastRouteResult = null;
+
+function renderMap(result) {
+  _lastRouteResult = result;
+}
+
+function initMap(result) {
+  const mapEl = document.getElementById('routeMap');
+  if (!mapEl || !result) return;
+
+  document.getElementById('mapPlaceholder').style.display = 'none';
+  mapEl.style.display = 'block';
+
+  if (_leafletMap) { _leafletMap.remove(); _leafletMap = null; }
+
+  _leafletMap = L.map('routeMap').setView([10.80, 106.72], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(_leafletMap);
+
+  const depotIcon = L.divIcon({
+    html: `<div style="background:#1A1A2E;color:white;width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)">🏭</div>`,
+    className:'', iconSize:[34,34], iconAnchor:[17,17]
+  });
+  L.marker([DEPOT.lat, DEPOT.lng], {icon: depotIcon}).addTo(_leafletMap)
+    .bindPopup(`<b>🏭 Kho Xuất Phát</b><br>${DEPOT.name}`);
+
+  const allBounds = [[DEPOT.lat, DEPOT.lng]];
+
+  function findPoint(stopName) {
+    const sn = stopName.toLowerCase().replace(/dookki\s*/i,'').trim();
+    return deliveryPoints.find(p => {
+      const pn = p.name.toLowerCase().replace(/dookki\s*/i,'').trim();
+      return p.name === stopName || pn === sn || pn.includes(sn) || sn.includes(pn);
+    });
+  }
+
+  result.routes.forEach(route => {
+    const color = route.color || '#C0392B';
+    const coords = [[DEPOT.lat, DEPOT.lng]];
+
+    (route.stops || []).forEach(stop => {
+      const pt = findPoint(stop.name);
+      if (!pt) return;
+      coords.push([pt.lat, pt.lng]);
+      allBounds.push([pt.lat, pt.lng]);
+
+      const markerIcon = L.divIcon({
+        html: `<div style="background:${color};color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.35)">${stop.order}</div>`,
+        className:'', iconSize:[28,28], iconAnchor:[14,14]
+      });
+      const late = isLateStop(stop.estimatedArrival, stop.timeWindow, stop.boxes);
+      const onTimeColor = late ? '#E74C3C' : '#27AE60';
+      L.marker([pt.lat, pt.lng], {icon: markerIcon}).addTo(_leafletMap)
+        .bindPopup(`
+          <b>${stop.name}</b><br>
+          📍 ${pt.addr}<br>
+          ⚖️ ${stop.weight}kg &nbsp;|&nbsp; 📦 ${stop.boxes||'?'} thùng<br>
+          ⏰ ${stop.timeWindow}<br>
+          <span style="color:${onTimeColor};font-weight:700">🕐 Đến: ${stop.estimatedArrival||'—'} (+${effectiveUnload(stop.boxes)}p) → Xong: ${addMinutes(stop.estimatedArrival, effectiveUnload(stop.boxes))||'—'} ${late?'⚠ TRỄ':'✓'}</span>
+        `);
+    });
+
+    L.polyline(coords, { color, weight: 3.5, opacity: 0.85, dashArray: '8 4' }).addTo(_leafletMap);
+  });
+
+  if (allBounds.length > 1) {
+    _leafletMap.fitBounds(allBounds, { padding: [24, 24] });
+  }
+  setTimeout(() => _leafletMap.invalidateSize(), 120);
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('content-' + tab).classList.add('active');
+  if (tab === 'map' && _lastRouteResult) {
+    setTimeout(() => initMap(_lastRouteResult), 60);
+  }
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + (type || '');
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ─── CONFIG TOGGLE ────────────────────────────────────────────────────
+function toggleConfig() {
+  const body  = document.getElementById("configBody");
+  const arrow = document.getElementById("configArrow");
+  const isOpen = body.classList.toggle("open");
+  arrow.classList.toggle("open", isOpen);
+  updateConfigSummary();
+}
+
+function updateConfigSummary() {
+  const kg = document.getElementById("vehicleCapacity").value;
+  const t  = document.getElementById("departureTime").value;
+  document.getElementById("configSummary").textContent = `AI đề xuất xe · ${kg}kg · ${t}`;
+}
+
+// Update summary whenever config values change
+["vehicleCapacity","departureTime"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", updateConfigSummary);
+});
+
+// ─── MASK TOGGLE ─────────────────────────────────────────────────────
+function toggleMask() {
+  const body = document.body;
+  const btn  = document.getElementById("maskBtn");
+  const on   = body.classList.toggle("hide-names");
+  btn.classList.toggle("active", on);
+  btn.innerHTML = on ? "👁 Hiện tên KH" : "🔒 Ẩn tên KH";
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────
+renderPoints();
+updateConfigSummary();
+</script>
+</body>
+</html>
